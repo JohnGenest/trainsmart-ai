@@ -3,6 +3,47 @@ import { useSession, signOut } from 'next-auth/react'
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
+// TypeScript interface for Speech Recognition
+interface SpeechRecognitionEvent {
+  resultIndex: number
+  results: {
+    length: number
+    [index: number]: {
+      [index: number]: {
+        transcript: string
+      }
+      isFinal: boolean
+    }
+  }
+}
+
+interface SpeechRecognitionErrorEvent {
+  error: string
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  start(): void
+  stop(): void
+  onstart: () => void
+  onresult: (event: SpeechRecognitionEvent) => void
+  onend: () => void
+  onerror: (event: SpeechRecognitionErrorEvent) => void
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: {
+      new(): SpeechRecognition
+    }
+    webkitSpeechRecognition: {
+      new(): SpeechRecognition
+    }
+  }
+}
+
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -10,7 +51,7 @@ export default function DashboardPage() {
   const [userInput, setUserInput] = useState('')
   const [isListening, setIsListening] = useState(false)
   const [transcript, setTranscript] = useState('')
-  const recognitionRef = useRef<any>(null)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
 
   // Voice recognition setup
   useEffect(() => {
@@ -26,7 +67,7 @@ export default function DashboardPage() {
         setIsListening(true)
       }
 
-      recognitionRef.current.onresult = (event: any) => {
+      recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
         let interimTranscript = ''
         let finalTranscript = ''
 
@@ -51,7 +92,7 @@ export default function DashboardPage() {
         setTranscript('')
       }
 
-      recognitionRef.current.onerror = (event: any) => {
+      recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
         setIsListening(false)
         setTranscript('')
         console.error('Speech recognition error:', event.error)
@@ -85,7 +126,7 @@ export default function DashboardPage() {
     return null
   }
 
-  // Sample workout data (we'll connect to Claude API next)
+  // Sample workout data
   const todaysWorkout = {
     type: "Tempo Run",
     distance: "6 miles",
@@ -116,22 +157,19 @@ export default function DashboardPage() {
       {/* Today's Workout Card */}
       <div className="max-w-md mx-auto">
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-          {/* Workout Header */}
           <div className="flex justify-between items-center mb-4 pb-2 border-b-2 border-blue-100">
             <div className="flex items-center gap-2">
               <span className="text-2xl">🏃‍♂️</span>
-              <span className="text-sm text-gray-600">Today's Training</span>
+              <span className="text-sm text-gray-600">Today&apos;s Training</span>
             </div>
             <div className="text-sm text-gray-500">Week 5, Day 2</div>
           </div>
 
-          {/* Workout Title */}
           <h2 className="text-2xl font-bold text-gray-800 mb-2">{todaysWorkout.type}</h2>
           <div className="text-lg text-gray-600 mb-4">
             {todaysWorkout.distance} • {todaysWorkout.duration}
           </div>
 
-          {/* Workout Details */}
           <div className="bg-gray-50 rounded-xl p-4 mb-4">
             {todaysWorkout.details.map((detail, index) => (
               <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
@@ -150,13 +188,11 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Coach Claude Tip */}
           <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-xl mb-4">
             <div className="text-sm opacity-90 mb-1">💡 Coach Claude says:</div>
             <div className="text-sm leading-relaxed">{todaysWorkout.coachingTip}</div>
           </div>
 
-          {/* Progress Bar */}
           <div className="mb-4">
             <div className="bg-gray-200 rounded-full h-2 mb-2">
               <div className="bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full" style={{width: '32%'}}></div>
@@ -164,7 +200,6 @@ export default function DashboardPage() {
             <div className="text-xs text-gray-600 text-center">Week 5 of 22 • 32% to Chicago Marathon</div>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex gap-3">
             <button className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-blue-600 hover:to-purple-700 transition-all duration-200 transform hover:-translate-y-1 hover:shadow-lg">
               Start Workout
@@ -201,19 +236,17 @@ export default function DashboardPage() {
             <div className="space-y-3 mb-4">
               <div className="bg-blue-50 p-3 rounded-lg">
                 <p className="text-blue-800 text-sm">
-                  <strong>You:</strong> How should today's tempo run feel?
+                  <strong>You:</strong> How should today&apos;s tempo run feel?
                 </p>
               </div>
               <div className="bg-gray-50 p-3 rounded-lg">
                 <p className="text-gray-800 text-sm">
-                  <strong>Coach Claude:</strong> Your tempo pace should feel "comfortably hard" - you should be able to say a few words but not hold a full conversation. Focus on consistent effort rather than exact pace. If you're struggling to maintain the pace, back off 10-15 seconds per mile.
+                  <strong>Coach Claude:</strong> Your tempo pace should feel &quot;comfortably hard&quot; - you should be able to say a few words but not hold a full conversation. Focus on consistent effort rather than exact pace.
                 </p>
               </div>
             </div>
 
-            {/* Voice Input Interface */}
             <div className="border-t pt-4">
-              {/* Live transcript display */}
               {(isListening || transcript) && (
                 <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center gap-2 mb-1">
@@ -228,7 +261,6 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* Input area */}
               <div className="flex gap-2">
                 <input 
                   type="text" 
@@ -239,7 +271,6 @@ export default function DashboardPage() {
                   onKeyPress={(e) => e.key === 'Enter' && userInput.trim() && alert('Claude integration coming next!')}
                 />
                 
-                {/* Voice Input Button */}
                 <button
                   onClick={isListening ? stopListening : startListening}
                   disabled={!recognitionRef.current}
@@ -264,7 +295,6 @@ export default function DashboardPage() {
                 </button>
               </div>
 
-              {/* Voice input instructions */}
               <div className="mt-2 text-xs text-gray-500 text-center">
                 {recognitionRef.current ? (
                   <>🎤 Click microphone to speak your question hands-free</>
